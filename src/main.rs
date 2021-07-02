@@ -21,5 +21,6 @@ fn main() {
   let ifmt_ctx: *mut *mut AVFormatContext = null_mut();
   let res = unsafe { avformat_open_input(ifmt_ctx, c_path, null_mut(), null_mut()) };
 
-  println!("res is {}", res);
+  let durtime = unsafe { **ifmt_ctx };
+  println!("res is {},time is {}", res, durtime.duration);
 }
