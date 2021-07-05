@@ -32,8 +32,8 @@ fn main() {
     } else {
       println!("视频打开成功");
     }
-    let value = ((*ifmt_ctx).duration) as i32;
-    let trade = ffmpeg::sys::AV_TIME_BASE;
+    let value = (*ifmt_ctx).duration;
+    let trade = ffmpeg::sys::AV_TIME_BASE as i64;
     let durtime =  value / trade ;
     let ctx = *ifmt_ctx;
     println!("res is {},time is {}", code, durtime);
