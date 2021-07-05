@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.js": "javascript",
+    "*.html": "html",
+    "*.art": "nunjucks",
+    "bitset": "c"
+  }
+}
