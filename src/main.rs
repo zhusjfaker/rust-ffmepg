@@ -16,7 +16,7 @@ fn main() {
   let output = unsafe { double_input(input) };
   println!("{} * 2 = {}", input, output);
 
-  let path = "/Users/zhushijie/Desktop/github/rust-ffmepg/assets/b.mp4";
+  let path = "/Users/zhushijie/Desktop/m3u8-demo/b.mp4";
   let c_path = CString::new(path).expect("CString::new failed").into_raw();
 
   unsafe {
@@ -32,7 +32,11 @@ fn main() {
     } else {
       println!("视频打开成功");
     }
-    let durtime = ((*ifmt_ctx).duration) as i32 / (ffmpeg::sys::AV_TIME_BASE);
+    let value = ((*ifmt_ctx).duration) as i32;
+    let trade = ffmpeg::sys::AV_TIME_BASE;
+    let durtime =  value / trade ;
+    let ctx = *ifmt_ctx;
     println!("res is {},time is {}", code, durtime);
+    println!("stream is {}", ctx.nb_streams);
   }
 }
