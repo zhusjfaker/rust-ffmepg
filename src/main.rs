@@ -57,9 +57,20 @@ fn main() {
       if (*acc).codec_type == AVMediaType_AVMEDIA_TYPE_VIDEO {
         let codec: *mut sys::AVCodec = sys::avcodec_find_decoder((*acc).codec_id);
         if codec == null_mut() {
-          println!("没有该类型的解码器!")
+          println!("没有该类型的解码器!");
+          break;
         }
+        let codec_ctx: *mut sys::AVCodecContext = sys::avcodec_alloc_context3(codec);
+        sys::avcodec_parameters_to_context(codec_ctx, acc);
+        let res = sys::avcodec_open2(codec_ctx, codec, null_mut());
+        if res != 0 {}
+        println!("解码器打开成功");
+        // let pFrame:*mut sys::AVFrame = sys::av_frame_alloc();
+        let mut packet: sys::AVPacket = std::mem::zeroed();
+        while sys::av_read_frame(ifmt_ctx, &mut packet) > 0 {}
       }
     }
   }
+
+  return;
 }
