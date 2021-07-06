@@ -34,9 +34,19 @@ fn main() {
     }
     let value = (*ifmt_ctx).duration;
     let trade = ffmpeg::sys::AV_TIME_BASE as i64;
-    let durtime =  value / trade ;
+    let durtime = value / trade;
     let ctx = *ifmt_ctx;
     println!("res is {},time is {}", code, durtime);
     println!("stream is {}", ctx.nb_streams);
+
+    let mut i = 0;
+    loop {
+      if i > (ctx.nb_streams - 1) {
+        break;
+      } else {
+        let mut codec_ctx = ctx.streams[i].codecpar;
+        i = i + 1;
+      }
+    }
   }
 }
