@@ -31,6 +31,8 @@ fn main() {
 
   unsafe {
     av_register_all();
+    let video_stream_idx = -1;
+    // let audio_stream_idx = -1;
     let mut ifmt_ctx: *mut AVFormatContext = null_mut();
     let code = avformat_open_input(&mut ifmt_ctx, c_path, null_mut(), null_mut());
     if code < 0 {
@@ -67,7 +69,12 @@ fn main() {
         println!("解码器打开成功");
         // let pFrame:*mut sys::AVFrame = sys::av_frame_alloc();
         let mut packet: sys::AVPacket = std::mem::zeroed();
-        while sys::av_read_frame(ifmt_ctx, &mut packet) > 0 {}
+        // let pFrame: *mut sys::AVFrame = null_mut();
+        while sys::av_read_frame(ifmt_ctx, &mut packet) > 0 {
+          if packet.stream_index == video_stream_idx {
+            // sys::avcodec_decode_video2(codec_ctx,pFrame,)
+          }
+        }
       }
     }
   }
