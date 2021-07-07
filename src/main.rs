@@ -9,7 +9,7 @@ use ffmpeg_dev::sys::AVFormatContext;
 use ffmpeg_dev::sys::AVMediaType_AVMEDIA_TYPE_VIDEO;
 use ffmpeg_dev::sys::AV_TIME_BASE;
 use std::ffi::CString;
-use std::fs;
+// use std::fs;
 use std::ptr::null_mut;
 use std::slice::from_raw_parts;
 
@@ -18,11 +18,11 @@ extern "C" {
   fn test(input: *const ::std::os::raw::c_char) -> libc::c_void;
 }
 
-fn SaveFrame(frame: *mut sys::AVFrame, index: i32) {
+// fn SaveFrame(frame: *mut sys::AVFrame, index: i32) {
   // let filepath = format!("{}.jpg", index.to_string());
   // let data = (*frame).data;
   // fs::write(filepath, data).unwrap();
-}
+// }
 
 fn main() {
   let input = 4;
@@ -78,6 +78,20 @@ fn main() {
         // let pFrame:*mut sys::AVFrame = sys::av_frame_alloc();
         let packet: *mut sys::AVPacket = sys::av_packet_alloc();
         let pframe: *mut sys::AVFrame = sys::av_frame_alloc();
+
+        let img_convert_ctx: *mut sys::SwsContext = sys::sws_getContext(
+          (*codec_ctx).width,
+          (*codec_ctx).height,
+          (*codec_ctx).pix_fmt,
+          (*codec_ctx).width,
+          (*codec_ctx).height,
+          sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P,
+          sys::SWS_BICUBIC as i32,
+          null_mut(),
+          null_mut(),
+          null_mut(),
+        );
+
         while sys::av_read_frame(ifmt_ctx, packet) >= 0 {
           let stream_index = (*packet).stream_index as usize;
           if video_stream_idx.contains(&stream_index) {
@@ -91,6 +105,7 @@ fn main() {
               break;
             }
             // println!("receiveframe_res is {}", receiveframe_res);
+            // sys::sws_scale(img_convert_ctx,(*pframe).data,(*pframe).linesize,0,(*codec_ctx).height)
           }
         }
       }
