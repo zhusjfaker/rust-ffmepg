@@ -18,11 +18,27 @@ extern "C" {
   fn test(input: *const ::std::os::raw::c_char) -> libc::c_void;
 }
 
-// fn SaveFrame(frame: *mut sys::AVFrame, index: i32) {
-  // let filepath = format!("{}.jpg", index.to_string());
-  // let data = (*frame).data;
-  // fs::write(filepath, data).unwrap();
-// }
+fn saveframe(
+  frame: *mut sys::AVFrame,
+  index: i32,
+  data: *mut u8,
+  linesize: *mut i32,
+  bufsize: i32,
+  with: i32,
+  height: i32,
+  pix_fmt: i32,
+) {
+  let filepath = format!("{}.jpg", index.to_string());
+  sys::av_image_copy(
+    &mut data,
+    linesize,
+    (*frame).data,
+    (*frame).linesize,
+    pix_fmt,
+    with,
+    height,
+  );
+}
 
 fn main() {
   let input = 4;
@@ -79,18 +95,34 @@ fn main() {
         let packet: *mut sys::AVPacket = sys::av_packet_alloc();
         let pframe: *mut sys::AVFrame = sys::av_frame_alloc();
 
-        let img_convert_ctx: *mut sys::SwsContext = sys::sws_getContext(
+        // let img_convert_ctx: *mut sys::SwsContext = sys::sws_getContext(
+        //   (*codec_ctx).width,
+        //   (*codec_ctx).height,
+        //   (*codec_ctx).pix_fmt,
+        //   (*codec_ctx).width,
+        //   (*codec_ctx).height,
+        //   sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P,
+        //   sys::SWS_BICUBIC as i32,
+        //   null_mut(),
+        //   null_mut(),
+        //   null_mut(),
+        // );
+
+        let mut pic_index = 1;
+        let mut video_dst_data: *mut u8 = null_mut();
+        let video_dst_linesize: *mut i32 = null_mut();
+        let video_dst_bufsize = sys::av_image_alloc(
+          &mut video_dst_data,
+          video_dst_linesize,
           (*codec_ctx).width,
           (*codec_ctx).height,
           (*codec_ctx).pix_fmt,
-          (*codec_ctx).width,
-          (*codec_ctx).height,
-          sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P,
-          sys::SWS_BICUBIC as i32,
-          null_mut(),
-          null_mut(),
-          null_mut(),
+          1,
         );
+        if video_dst_bufsize < 0 {
+          println!("图片空间计算失败");
+          break;
+        }
 
         while sys::av_read_frame(ifmt_ctx, packet) >= 0 {
           let stream_index = (*packet).stream_index as usize;
@@ -104,6 +136,17 @@ fn main() {
             if receiveframe_res != 0 {
               break;
             }
+            pic_index += 1;
+            saveframe(
+              pframe,
+              pic_index,
+              video_dst_data,
+              video_dst_linesize,
+              video_dst_bufsize,
+              (*codec_ctx).width,
+              (*codec_ctx).height,
+              (*codec_ctx).pix_fmt,
+            );
             // println!("receiveframe_res is {}", receiveframe_res);
             // sys::sws_scale(img_convert_ctx,(*pframe).data,(*pframe).linesize,0,(*codec_ctx).height)
           }
