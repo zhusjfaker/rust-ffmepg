@@ -24,14 +24,13 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32, with: i32, height: i32, pix_f
     let project_path = "/Users/zhushijie/Desktop/github/rust-ffmepg";
     let filepath = format!("{}/{}.jpg", project_path, index.to_string());
     println!("pic name is {}", filepath);
-    let frame_data = (*frame).data.as_ptr() as *mut *const u8;
-    let frame_linesize = &(*frame).linesize as *const i32;
+
     let bufsize = sys::av_image_alloc(
       (*frame).data.as_mut_ptr(),
       (*frame).linesize.as_mut_ptr(),
       (*frame).width,
       (*frame).height,
-      sys::AVPixelFormat_AV_PIX_FMT_BGR24,
+      pix_fmt,
       32,
     );
     println!("当前图片计算大小->{}", bufsize);
@@ -43,8 +42,8 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32, with: i32, height: i32, pix_f
     sys::av_image_copy(
       cp_data.as_mut_ptr(),
       linesize.as_mut_ptr(),
-      frame_data,
-      frame_linesize,
+      (*frame).data.as_mut_ptr() as *mut *const u8,
+      (*frame).linesize.as_mut_ptr(),
       pix_fmt,
       with,
       height,
@@ -143,7 +142,7 @@ fn main() {
               break;
             }
             pic_index += 1;
-            if pic_index < 5 {
+            if pic_index < 50 {
               saveframe(
                 pframe,
                 pic_index,
