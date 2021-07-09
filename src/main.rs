@@ -138,26 +138,26 @@ fn main() {
           (*codec_ctx).height,
           (*codec_ctx).pix_fmt
         );
-        let img_convert_ctx: *mut sys::SwsContext = sys::sws_getContext(
-          (*codec_ctx).width,
-          (*codec_ctx).height,
-          (*codec_ctx).pix_fmt,
-          (*codec_ctx).width,
-          (*codec_ctx).height,
-          sys::AVPixelFormat_AV_PIX_FMT_RGB24,
-          sys::SWS_BILINEAR as i32,
-          null_mut(),
-          null_mut(),
-          null_mut(),
-        );
+        // let img_convert_ctx: *mut sys::SwsContext = sys::sws_getContext(
+        //   (*codec_ctx).width,
+        //   (*codec_ctx).height,
+        //   (*codec_ctx).pix_fmt,
+        //   (*codec_ctx).width,
+        //   (*codec_ctx).height,
+        //   sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+        //   sys::SWS_BILINEAR as i32,
+        //   null_mut(),
+        //   null_mut(),
+        //   null_mut(),
+        // );
 
         let mut pic_index = 1;
         let mut framefinished: i32 = std::mem::zeroed();
 
         while sys::av_read_frame(ifmt_ctx, packet) >= 0 {
-          // let stream_index = (*packet).stream_index as usize;
-          // if video_stream_idx.contains(&stream_index) && (*packet).flags == 1 {
-          if (*packet).flags == 1 {
+          let stream_index = (*packet).stream_index as usize;
+          if video_stream_idx.contains(&stream_index) && (*packet).flags == 1 {
+          // if (*packet).flags == 1 {
             // let sendpacket_res = sys::avcodec_send_packet(codec_ctx, packet);
             // // println!("sendpacket_res is {}", sendpacket_res);
             // if sendpacket_res != 0 {
@@ -171,17 +171,17 @@ fn main() {
 
             pic_index += 1;
             if pic_index < 50 && framefinished != std::mem::zeroed() {
-              let h = sys::sws_scale(
-                img_convert_ctx,
-                (*pframe).data.as_ptr() as *mut *const u8,
-                (*pframe).linesize.as_ptr(),
-                0,
-                (*codec_ctx).height,
-                (*tr_frame).data.as_ptr(),
-                (*tr_frame).linesize.as_ptr(),
-              );
+              // let h = sys::sws_scale(
+              //   img_convert_ctx,
+              //   (*pframe).data.as_ptr() as *mut *const u8,
+              //   (*pframe).linesize.as_ptr(),
+              //   0,
+              //   (*codec_ctx).height,
+              //   (*tr_frame).data.as_ptr(),
+              //   (*tr_frame).linesize.as_ptr(),
+              // );
 
-              println!("重新计算的高端:{}", h);
+              // println!("重新计算的高端:{}", h);
 
               saveframe(
                 pframe,
