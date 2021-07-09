@@ -11,6 +11,7 @@ use ffmpeg_dev::sys::AV_TIME_BASE;
 use std::ffi::CString;
 // use std::fs::File;
 // use std::io::Write;
+use std::mem::size_of;
 use std::ptr::null_mut;
 use std::slice::from_raw_parts;
 
@@ -62,7 +63,7 @@ fn main() {
   let output = unsafe { double_input(input) };
   println!("{} * 2 = {}", input, output);
 
-  let path = "/Users/zhushijie/Desktop/m3u8-demo/b.mp4";
+  let path = "/Users/zhushijie/Desktop/m3u8-demo/test.mp4";
   // let path = "/Users/zhushijie/Desktop/demo/m3u8-demo/a.mp4";
   let c_path = CString::new(path).expect("CString::new failed").into_raw();
 
@@ -112,25 +113,39 @@ fn main() {
         let packet: *mut sys::AVPacket = sys::av_packet_alloc();
         let pframe: *mut sys::AVFrame = sys::av_frame_alloc();
         let tr_frame: *mut sys::AVFrame = sys::av_frame_alloc();
-        (*tr_frame).format = (*codec_ctx).pix_fmt;
-        (*tr_frame).width = (*codec_ctx).width;
-        (*tr_frame).height = (*codec_ctx).height;
-        (*tr_frame).color_range = (*codec_ctx).color_range;
 
-        let res_mermeoy_frame = sys::av_frame_get_buffer(tr_frame, 0);
-        if res_mermeoy_frame < 0 {
-          println!("转换帧开辟内存失败!");
-          break;
-        }
+        let numbytes = sys::av_image_get_buffer_size(
+          sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+          (*codec_ctx).width,
+          (*codec_ctx).height,
+          1,
+        ) as usize;
 
+        let buffer = sys::av_malloc(numbytes * size_of::<u8>()) as *mut u8;
+        sys::av_image_fill_arrays(
+          (*tr_frame).data.as_mut_ptr(),
+          (*tr_frame).linesize.as_mut_ptr(),
+          buffer,
+          sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+          (*codec_ctx).width,
+          (*codec_ctx).height,
+          1,
+        );
+
+        println!(
+          "width: {} height: {} pix_fmt: {}",
+          (*codec_ctx).width,
+          (*codec_ctx).height,
+          (*codec_ctx).pix_fmt
+        );
         let img_convert_ctx: *mut sys::SwsContext = sys::sws_getContext(
           (*codec_ctx).width,
           (*codec_ctx).height,
           (*codec_ctx).pix_fmt,
           (*codec_ctx).width,
           (*codec_ctx).height,
-          sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P,
-          sys::SWS_BICUBIC as i32,
+          sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+          sys::SWS_BILINEAR as i32,
           null_mut(),
           null_mut(),
           null_mut(),
@@ -152,15 +167,17 @@ fn main() {
             }
             pic_index += 1;
             if pic_index < 50 {
-              sys::sws_scale(
+              let h = sys::sws_scale(
                 img_convert_ctx,
                 (*pframe).data.as_ptr() as *mut *const u8,
                 (*pframe).linesize.as_ptr(),
-                (*pframe).width,
-                (*pframe).height,
+                0,
+                (*codec_ctx).height,
                 (*tr_frame).data.as_ptr(),
                 (*tr_frame).linesize.as_ptr(),
               );
+
+              println!("重新计算的高端:{}", h);
 
               saveframe(
                 pframe,
