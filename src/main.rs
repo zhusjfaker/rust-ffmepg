@@ -9,7 +9,7 @@ use ffmpeg_dev::sys::AVFormatContext;
 use ffmpeg_dev::sys::AVMediaType_AVMEDIA_TYPE_VIDEO;
 use ffmpeg_dev::sys::AV_TIME_BASE;
 use std::ffi::CString;
-use std::mem::size_of;
+// use std::mem::size_of;
 // use std::mem::zeroed;
 use std::ptr::null_mut;
 use std::slice::from_raw_parts;
@@ -19,32 +19,40 @@ extern "C" {
   fn test(input: *const ::std::os::raw::c_char) -> libc::c_void;
 }
 
-fn saveframe(frame: *mut sys::AVFrame, index: i32, _with: i32, _height: i32, pix_fmt: i32) {
+fn saveframe(frame: *mut sys::AVFrame, index: i32) {
   unsafe {
     let project_path = "/Users/zhushijie/Desktop/github/rust-ffmepg";
     let filepath = format!("{}/{}.bmp", project_path, index.to_string());
     println!("pic name is {}", filepath);
 
-    let bufsize = sys::av_image_alloc(
-      (*frame).data.as_mut_ptr(),
-      (*frame).linesize.as_mut_ptr(),
-      (*frame).width,
-      (*frame).height,
-      pix_fmt,
-      32,
-    );
-    println!("当前图片计算大小->{}", bufsize);
+    // let unpadded_linesize =
+    //   ((*frame).nb_samples * sys::av_get_bytes_per_sample((*frame).format)) as usize;
 
     let fp = libc::fopen(
       CString::new(filepath)
         .expect("CString::new failed")
         .into_raw(),
-      CString::new("w").expect("CString::new failed").into_raw(),
+      CString::new("wb").expect("CString::new failed").into_raw(),
     );
 
-    let data = (*frame).data[0] as *const libc::c_void;
+    // let rust_header = format!("P6\n{} {}\n255\n", width, height);
+    // let c_hader = CString::new(rust_header)
+    //   .expect("CString::new failed")
+    //   .into_raw();
 
-    libc::fwrite(data, 1, bufsize as usize, fp);
+    // libc::fprintf(fp, c_hader);
+
+    let bufsize = sys::av_image_alloc(
+      (*frame).data.as_mut_ptr(),
+      (*frame).linesize.as_mut_ptr(),
+      (*frame).format,
+      (*frame).width,
+      (*frame).height,
+      1,
+    ) as usize;
+
+    let data = (*frame).data[0] as *const libc::c_void;
+    libc::fwrite(data, 1, bufsize, fp);
 
     libc::fclose(fp);
   }
@@ -111,23 +119,31 @@ fn main() {
         let pframe: *mut sys::AVFrame = sys::av_frame_alloc();
         let tr_frame: *mut sys::AVFrame = sys::av_frame_alloc();
 
-        let numbytes = sys::av_image_get_buffer_size(
+        let picturesize = sys::avpicture_get_size(
           sys::AVPixelFormat_AV_PIX_FMT_RGB24,
           (*codec_ctx).width,
           (*codec_ctx).height,
-          1,
         ) as usize;
 
-        let buffer = sys::av_malloc(numbytes * size_of::<u8>()) as *mut u8;
-        sys::av_image_fill_arrays(
-          (*tr_frame).data.as_mut_ptr(),
-          (*tr_frame).linesize.as_mut_ptr(),
+        let buffer = sys::av_malloc(picturesize) as *mut u8;
+
+        sys::avpicture_fill(
+          tr_frame as *mut sys::AVPicture,
           buffer,
           sys::AVPixelFormat_AV_PIX_FMT_RGB24,
           (*codec_ctx).width,
           (*codec_ctx).height,
-          1,
         );
+
+        // sys::av_image_fill_arrays(
+        //   (*tr_frame).data.as_mut_ptr(),
+        //   (*tr_frame).linesize.as_mut_ptr(),
+        //   buffer,
+        //   sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+        //   (*codec_ctx).width,
+        //   (*codec_ctx).height,
+        //   1,
+        // );
 
         println!(
           "width: {} height: {} pix_fmt: {}",
@@ -171,13 +187,7 @@ fn main() {
 
               println!("重新计算的高端:{}", h);
 
-              saveframe(
-                tr_frame,
-                pic_index,
-                (*codec_ctx).width,
-                (*codec_ctx).height,
-                sys::AVPixelFormat_AV_PIX_FMT_RGB24,
-              );
+              saveframe(tr_frame, pic_index);
             } else {
               break;
             }
