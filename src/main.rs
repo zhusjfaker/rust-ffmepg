@@ -11,6 +11,7 @@ use ffmpeg_dev::sys::AV_TIME_BASE;
 use std::ffi::CString;
 // use std::mem::size_of;
 // use std::mem::zeroed;
+use std::fs;
 use std::ptr::null_mut;
 use std::slice::from_raw_parts;
 
@@ -21,7 +22,14 @@ extern "C" {
 
 fn saveframe(frame: *mut sys::AVFrame, index: i32) {
   unsafe {
-    let project_path = "/Users/zhushijie/Desktop/github/rust-ffmepg";
+    let project_path = "/Users/zhushijie/Desktop/github/rust-ffmepg/assets";
+    if !std::path::Path::new(&project_path).exists() {
+      fs::create_dir(project_path).unwrap();
+    } else {
+      fs::remove_dir_all(project_path).unwrap();
+      fs::create_dir(project_path).unwrap();
+    }
+
     let filepath = format!("{}/{}.bmp", project_path, index.to_string());
     println!("pic name is {}", filepath);
 
