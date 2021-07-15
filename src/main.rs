@@ -22,6 +22,28 @@ extern "C" {
 
 const PROJECT_PATH: &str = "/Users/zhushijie/Desktop/github/rust-ffmepg/assets";
 
+struct BITMAPFILEHEADER {
+  bfSize: usize,
+  bfReserved1: libc::c_int,
+  bfReserved2: libc::c_int,
+  bfOffBits: usize,
+  bfType: u16,
+}
+
+
+struct BITMAPINFOHEADER {
+  biWidth: libc::c_int,
+  biHeight: libc::c_int,
+  biPlanes: libc::c_int,
+  biBitCount: libc::c_int,
+  biSizeImage: libc::c_int,
+  biXPelsPerMeter: libc::c_int,
+  biYPelsPerMeter: libc::c_int,
+  biClrUsed: libc::c_int,
+  biClrImportant: libc::c_int,
+}
+
+
 fn mange_project_path() {
   if !std::path::Path::new(&PROJECT_PATH).exists() {
     fs::create_dir(PROJECT_PATH).unwrap();
@@ -36,6 +58,29 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32) {
     let filepath = format!("{}/{}.bmp", PROJECT_PATH, index.to_string());
     println!("pic name is {}", filepath);
 
+    let bfSize = ((*frame).width * (*frame).height * 24) as usize + 54;
+
+    let mut bif_header = Box::new(BITMAPFILEHEADER {
+      bfType: ('B' as u16) | (('M' as u16) << 8),
+      bfOffBits: 54,
+      bfReserved1: 0,
+      bfReserved2: 0,
+      bfSize: bfSize,
+    });
+
+    let bif_info = BITMAPINFOHEADER {
+      // biSize: std::mem::size_of::<wingdi::BITMAPINFOHEADER>(),
+      biWidth: (*frame).width,
+      biHeight: (*frame).height,
+      biPlanes: 1,
+      biBitCount: 24,
+      biSizeImage:((*frame).width*24+31)/32*4* (*frame).height,
+      biXPelsPerMeter: 100,
+      biYPelsPerMeter: 100,
+      biClrUsed: 0,
+      biClrImportant: 0,
+    };
+
     let fp = libc::fopen(
       CString::new(filepath).unwrap().into_raw(),
       CString::new("wb").unwrap().into_raw(),
@@ -45,6 +90,17 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32) {
     println!("bufsize is {}", bufsize);
 
     let data = (*frame).data[0] as *const libc::c_void;
+
+    let header_poiont = &bif_header;
+
+    let p = bif_header.as_mut();
+
+    libc::fwrite(
+      bif_header.as_mut() ,
+      std::mem::size_of_val(&bif_header),
+      1,
+      fp,
+    );
     libc::fwrite(data, bufsize, 1, fp);
 
     libc::fclose(fp);
