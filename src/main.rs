@@ -36,8 +36,6 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32) {
     let filepath = format!("{}/{}.bmp", PROJECT_PATH, index.to_string());
     println!("pic name is {}", filepath);
 
-    let bmpheader: libc::BITMAPFILEHEADER = std::mem::uninitialized();
-
     let fp = libc::fopen(
       CString::new(filepath).unwrap().into_raw(),
       CString::new("wb").unwrap().into_raw(),
