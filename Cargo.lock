@@ -351,6 +351,7 @@ dependencies = [
  "libc",
  "serde",
  "serde_json",
+ "winapi",
 ]
 
 [[package]]
