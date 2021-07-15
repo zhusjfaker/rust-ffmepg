@@ -20,17 +20,20 @@ extern "C" {
   fn test(input: *const ::std::os::raw::c_char) -> libc::c_void;
 }
 
+const PROJECT_PATH: &str = "/Users/zhushijie/Desktop/github/rust-ffmepg/assets";
+
+fn mange_project_path() {
+  if !std::path::Path::new(&PROJECT_PATH).exists() {
+    fs::create_dir(PROJECT_PATH).unwrap();
+  } else {
+    fs::remove_dir_all(PROJECT_PATH).unwrap();
+    fs::create_dir(PROJECT_PATH).unwrap();
+  }
+}
+
 fn saveframe(frame: *mut sys::AVFrame, index: i32) {
   unsafe {
-    let project_path = "/Users/zhushijie/Desktop/github/rust-ffmepg/assets";
-    if !std::path::Path::new(&project_path).exists() {
-      fs::create_dir(project_path).unwrap();
-    } else {
-      fs::remove_dir_all(project_path).unwrap();
-      fs::create_dir(project_path).unwrap();
-    }
-
-    let filepath = format!("{}/{}.bmp", project_path, index.to_string());
+    let filepath = format!("{}/{}.bmp", PROJECT_PATH, index.to_string());
     println!("pic name is {}", filepath);
 
     // let unpadded_linesize =
@@ -80,6 +83,7 @@ fn main() {
   };
 
   unsafe {
+    mange_project_path();
     av_register_all();
     sys::avdevice_register_all();
     let mut video_stream_idx: Vec<usize> = Vec::new();
@@ -161,44 +165,57 @@ fn main() {
         );
 
         let mut pic_index = 1;
-        let mut framefinished: i32 = 0;
 
         while sys::av_read_frame(ifmt_ctx, packet) >= 0 {
           let stream_index = (*packet).stream_index as usize;
-          if video_stream_idx.contains(&stream_index) && (*packet).flags == 1 {
-            sys::avcodec_decode_video2(codec_ctx, pframe, &mut framefinished, packet);
-
-            pic_index += 1;
-            if pic_index < 20 && framefinished > 0 {
-              let img_convert_ctx: *mut sys::SwsContext = sys::sws_getContext(
-                (*pframe).width,
-                (*pframe).height,
-                (*pframe).format,
-                (*pframe).width,
-                (*pframe).height,
-                sys::AVPixelFormat_AV_PIX_FMT_RGB24,
-                sys::SWS_BILINEAR as i32,
-                null_mut(),
-                null_mut(),
-                null_mut(),
-              );
-
-              let h = sys::sws_scale(
-                img_convert_ctx,
-                (*pframe).data.as_ptr() as *mut *const u8,
-                (*pframe).linesize.as_ptr(),
-                0,
-                (*codec_ctx).height,
-                (*tr_frame).data.as_ptr(),
-                (*tr_frame).linesize.as_ptr(),
-              );
-
-              println!("重新计算的高端:{}", h);
-
-              saveframe(tr_frame, pic_index);
-            } else {
-              break;
+          if video_stream_idx.contains(&stream_index) {
+            let ret_send = sys::avcodec_send_packet(codec_ctx, packet);
+            if ret_send < 0 {
+              println!("发送视频帧失败,跳过");
+              continue;
             }
+            let receive_ret = sys::avcodec_receive_frame(codec_ctx, pframe);
+            if receive_ret < 0 {
+              println!("解码获取 视频帧失败,跳过");
+              continue;
+            }
+
+            if (*pframe).flags == 1 {
+              pic_index += 1;
+
+              if pic_index < 20 {
+                let img_convert_ctx: *mut sys::SwsContext = sys::sws_getContext(
+                  (*pframe).width,
+                  (*pframe).height,
+                  (*pframe).format,
+                  (*pframe).width,
+                  (*pframe).height,
+                  sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+                  sys::SWS_BILINEAR as i32,
+                  null_mut(),
+                  null_mut(),
+                  null_mut(),
+                );
+
+                let h = sys::sws_scale(
+                  img_convert_ctx,
+                  (*pframe).data.as_ptr() as *mut *const u8,
+                  (*pframe).linesize.as_ptr(),
+                  0,
+                  (*codec_ctx).height,
+                  (*tr_frame).data.as_ptr(),
+                  (*tr_frame).linesize.as_ptr(),
+                );
+
+                println!("重新计算的高端:{}", h);
+
+                saveframe(tr_frame, pic_index);
+              } else {
+                break;
+              }
+            }
+          } else {
+            println!("解码帧的 索引 不包含在 视频流 中!");
           }
         }
 
