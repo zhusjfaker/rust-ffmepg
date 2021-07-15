@@ -36,36 +36,21 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32) {
     let filepath = format!("{}/{}.bmp", PROJECT_PATH, index.to_string());
     println!("pic name is {}", filepath);
 
-    // let unpadded_linesize =
-    //   ((*frame).nb_samples * sys::av_get_bytes_per_sample((*frame).format)) as usize;
+    let bmpheader: libc::BITMAPFILEHEADER = std::mem::uninitialized();
 
     let fp = libc::fopen(
-      CString::new(filepath)
-        .expect("CString::new failed")
-        .into_raw(),
-      CString::new("wb").expect("CString::new failed").into_raw(),
+      CString::new(filepath).unwrap().into_raw(),
+      CString::new("wb").unwrap().into_raw(),
     );
 
-    // let rust_header = format!("P6\n{} {}\n255\n", width, height);
-    // let c_hader = CString::new(rust_header)
-    //   .expect("CString::new failed")
-    //   .into_raw();
-
-    // libc::fprintf(fp, c_hader);
-
-    let bufsize = sys::av_image_alloc(
-      (*frame).data.as_mut_ptr(),
-      (*frame).linesize.as_mut_ptr(),
-      (*frame).format,
-      (*frame).width,
-      (*frame).height,
-      1,
-    ) as usize;
+    let bufsize = ((*frame).width * (*frame).height * 24 / 8) as usize;
+    println!("bufsize is {}", bufsize);
 
     let data = (*frame).data[0] as *const libc::c_void;
-    libc::fwrite(data, 1, bufsize, fp);
+    libc::fwrite(data, bufsize, 1, fp);
 
     libc::fclose(fp);
+    return;
   }
 }
 
@@ -180,7 +165,7 @@ fn main() {
               continue;
             }
 
-            if (*pframe).flags == 1 {
+            if (*packet).flags == 1 {
               pic_index += 1;
 
               if pic_index < 20 {
@@ -214,8 +199,6 @@ fn main() {
                 break;
               }
             }
-          } else {
-            println!("解码帧的 索引 不包含在 视频流 中!");
           }
         }
 
