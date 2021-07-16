@@ -9,8 +9,6 @@ use ffmpeg_dev::sys::AVFormatContext;
 use ffmpeg_dev::sys::AVMediaType_AVMEDIA_TYPE_VIDEO;
 use ffmpeg_dev::sys::AV_TIME_BASE;
 use std::ffi::CString;
-// use std::mem::size_of;
-// use std::mem::zeroed;
 use std::fs;
 use std::ptr::null_mut;
 use std::slice::from_raw_parts;
@@ -21,28 +19,6 @@ extern "C" {
 }
 
 const PROJECT_PATH: &str = "/Users/zhushijie/Desktop/github/rust-ffmepg/assets";
-
-struct BITMAPFILEHEADER {
-  bfSize: usize,
-  bfReserved1: libc::c_int,
-  bfReserved2: libc::c_int,
-  bfOffBits: usize,
-  bfType: u16,
-}
-
-
-struct BITMAPINFOHEADER {
-  biWidth: libc::c_int,
-  biHeight: libc::c_int,
-  biPlanes: libc::c_int,
-  biBitCount: libc::c_int,
-  biSizeImage: libc::c_int,
-  biXPelsPerMeter: libc::c_int,
-  biYPelsPerMeter: libc::c_int,
-  biClrUsed: libc::c_int,
-  biClrImportant: libc::c_int,
-}
-
 
 fn mange_project_path() {
   if !std::path::Path::new(&PROJECT_PATH).exists() {
@@ -55,55 +31,76 @@ fn mange_project_path() {
 
 fn saveframe(frame: *mut sys::AVFrame, index: i32) {
   unsafe {
-    let filepath = format!("{}/{}.bmp", PROJECT_PATH, index.to_string());
+    let filepath = format!("{}/{}.jpg", PROJECT_PATH, index.to_string());
     println!("pic name is {}", filepath);
-
-    let bfSize = ((*frame).width * (*frame).height * 24) as usize + 54;
-
-    let mut bif_header = Box::new(BITMAPFILEHEADER {
-      bfType: ('B' as u16) | (('M' as u16) << 8),
-      bfOffBits: 54,
-      bfReserved1: 0,
-      bfReserved2: 0,
-      bfSize: bfSize,
-    });
-
-    let bif_info = BITMAPINFOHEADER {
-      // biSize: std::mem::size_of::<wingdi::BITMAPINFOHEADER>(),
-      biWidth: (*frame).width,
-      biHeight: (*frame).height,
-      biPlanes: 1,
-      biBitCount: 24,
-      biSizeImage:((*frame).width*24+31)/32*4* (*frame).height,
-      biXPelsPerMeter: 100,
-      biYPelsPerMeter: 100,
-      biClrUsed: 0,
-      biClrImportant: 0,
-    };
-
-    let fp = libc::fopen(
-      CString::new(filepath).unwrap().into_raw(),
-      CString::new("wb").unwrap().into_raw(),
+    let c_filepath = CString::new(filepath).unwrap().into_raw();
+    let p_format_ctx: *mut sys::AVFormatContext = sys::avformat_alloc_context();
+    (*p_format_ctx).oformat = sys::av_guess_format(
+      CString::new("mjpeg").unwrap().into_raw(),
+      null_mut(),
+      null_mut(),
     );
-
-    let bufsize = ((*frame).width * (*frame).height * 24 / 8) as usize;
-    println!("bufsize is {}", bufsize);
-
-    let data = (*frame).data[0] as *const libc::c_void;
-
-    let header_poiont = &bif_header;
-
-    let p = bif_header.as_mut();
-
-    libc::fwrite(
-      bif_header.as_mut() ,
-      std::mem::size_of_val(&bif_header),
-      1,
-      fp,
+    let write_res = sys::avio_open(
+      &mut (*p_format_ctx).pb,
+      c_filepath,
+      sys::AVIO_FLAG_READ_WRITE as i32,
     );
-    libc::fwrite(data, bufsize, 1, fp);
+    if write_res < 0 {
+      println!("Couldn't open output file");
+      return;
+    }
 
-    libc::fclose(fp);
+    let p_avstream = sys::avformat_new_stream(p_format_ctx, null_mut());
+    if p_avstream == null_mut() {
+      return;
+    }
+    let p_codecctx = (*p_avstream).codec;
+    (*p_codecctx).codec_id = (*(*p_format_ctx).oformat).video_codec;
+    (*p_codecctx).pix_fmt = (*frame).format;
+    (*p_codecctx).width = (*frame).width;
+    (*p_codecctx).height = (*frame).height;
+    (*p_codecctx).time_base.num = 1;
+    (*p_codecctx).time_base.den = 25;
+
+    sys::av_dump_format(p_format_ctx, 0, c_filepath, 1);
+
+    let p_codec = sys::avcodec_find_encoder((*p_codecctx).codec_id);
+    if p_codec == null_mut() {
+      println!("Codec not found code binary.");
+      return;
+    }
+
+    let code_res = sys::avcodec_open2(p_codecctx, p_codec, null_mut());
+    if code_res < 0 {
+      println!("Could not open codec.");
+      return;
+    }
+
+    sys::avformat_write_header(p_format_ctx, null_mut());
+
+    let y_size = (*frame).width * (*frame).height;
+    let pkt: *mut sys::AVPacket = sys::av_packet_alloc();
+    sys::av_new_packet(pkt, y_size * 3);
+
+    let mut got_picture = 0;
+    let pic_decode_res = sys::avcodec_encode_video2(p_codecctx, pkt, frame, &mut got_picture);
+    if pic_decode_res < 0 {
+      println!("Encode Error");
+      return;
+    }
+    if got_picture > 0 {
+      sys::av_write_frame(p_format_ctx, pkt);
+    }
+    sys::av_free_packet(pkt);
+    sys::av_write_trailer(p_format_ctx);
+    println!("Encode Successful");
+
+    if p_avstream != null_mut() {
+      sys::avcodec_close((*p_avstream).codec);
+    }
+    sys::avio_close((*p_format_ctx).pb);
+    sys::avformat_free_context(p_format_ctx);
+
     return;
   }
 }
@@ -186,16 +183,6 @@ fn main() {
           (*codec_ctx).height,
         );
 
-        // sys::av_image_fill_arrays(
-        //   (*tr_frame).data.as_mut_ptr(),
-        //   (*tr_frame).linesize.as_mut_ptr(),
-        //   buffer,
-        //   sys::AVPixelFormat_AV_PIX_FMT_RGB24,
-        //   (*codec_ctx).width,
-        //   (*codec_ctx).height,
-        //   1,
-        // );
-
         println!(
           "width: {} height: {} pix_fmt: {}",
           (*codec_ctx).width,
@@ -229,7 +216,7 @@ fn main() {
                   (*pframe).format,
                   (*pframe).width,
                   (*pframe).height,
-                  sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+                  sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P,
                   sys::SWS_BILINEAR as i32,
                   null_mut(),
                   null_mut(),
