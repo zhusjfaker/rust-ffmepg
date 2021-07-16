@@ -54,23 +54,35 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32) {
     if p_avstream == null_mut() {
       return;
     }
-    let p_codecctx = (*p_avstream).codec;
-    (*p_codecctx).codec_id = (*(*p_format_ctx).oformat).video_codec;
-    (*p_codecctx).pix_fmt = (*frame).format;
-    (*p_codecctx).width = (*frame).width;
-    (*p_codecctx).height = (*frame).height;
-    (*p_codecctx).time_base.num = 1;
-    (*p_codecctx).time_base.den = 25;
+    let parameters = (*p_avstream).codecpar;
+    (*parameters).codec_id = (*(*p_format_ctx).oformat).video_codec;
+    (*parameters).codec_type = sys::AVMediaType_AVMEDIA_TYPE_VIDEO;
+    (*parameters).format = sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P;
+    (*parameters).width = (*frame).width;
+    (*parameters).height = (*frame).height;
 
     sys::av_dump_format(p_format_ctx, 0, c_filepath, 1);
 
-    let p_codec = sys::avcodec_find_encoder((*p_codecctx).codec_id);
+    let p_codec = sys::avcodec_find_encoder((*(*p_avstream).codecpar).codec_id);
     if p_codec == null_mut() {
-      println!("Codec not found code binary.");
+      println!("Could not find encoder.");
       return;
     }
 
-    let code_res = sys::avcodec_open2(p_codecctx, p_codec, null_mut());
+    let p_codectx = sys::avcodec_alloc_context3(p_codec);
+    if p_codectx == null_mut() {
+      println!("Could not allocate video codec context");
+      return;
+    }
+
+    if sys::avcodec_parameters_to_context(p_codectx, (*p_avstream).codecpar) < 0 {
+      println!("Failed to copy,codec parameters to decoder context!");
+      return;
+    }
+
+    (*p_codectx).time_base = sys::AVRational { num: 1, den: 25 };
+
+    let code_res = sys::avcodec_open2(p_codectx, p_codec, null_mut());
     if code_res < 0 {
       println!("Could not open codec.");
       return;
@@ -83,7 +95,7 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32) {
     sys::av_new_packet(pkt, y_size * 3);
 
     let mut got_picture = 0;
-    let pic_decode_res = sys::avcodec_encode_video2(p_codecctx, pkt, frame, &mut got_picture);
+    let pic_decode_res = sys::avcodec_encode_video2(p_codectx, pkt, frame, &mut got_picture);
     if pic_decode_res < 0 {
       println!("Encode Error");
       return;
@@ -168,7 +180,7 @@ fn main() {
         let tr_frame: *mut sys::AVFrame = sys::av_frame_alloc();
 
         let picturesize = sys::avpicture_get_size(
-          sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+          sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P,
           (*codec_ctx).width,
           (*codec_ctx).height,
         ) as usize;
@@ -178,7 +190,7 @@ fn main() {
         sys::avpicture_fill(
           tr_frame as *mut sys::AVPicture,
           buffer,
-          sys::AVPixelFormat_AV_PIX_FMT_RGB24,
+          sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P,
           (*codec_ctx).width,
           (*codec_ctx).height,
         );
@@ -217,7 +229,7 @@ fn main() {
                   (*pframe).width,
                   (*pframe).height,
                   sys::AVPixelFormat_AV_PIX_FMT_YUVJ420P,
-                  sys::SWS_BILINEAR as i32,
+                  sys::SWS_BICUBIC as i32,
                   null_mut(),
                   null_mut(),
                   null_mut(),
