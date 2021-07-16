@@ -40,6 +40,7 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32) {
       null_mut(),
       null_mut(),
     );
+    println!("codeid is {}",(*(*p_format_ctx).oformat).video_codec);
     let write_res = sys::avio_open(
       &mut (*p_format_ctx).pb,
       c_filepath,
@@ -50,7 +51,8 @@ fn saveframe(frame: *mut sys::AVFrame, index: i32) {
       return;
     }
 
-    let p_avstream = sys::avformat_new_stream(p_format_ctx, null_mut());
+    let codec: *mut sys::AVCodec = sys::avcodec_find_decoder((*(*p_format_ctx).oformat).video_codec);
+    let p_avstream = sys::avformat_new_stream(p_format_ctx, codec);
     if p_avstream == null_mut() {
       return;
     }
